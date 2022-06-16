@@ -47,6 +47,7 @@ int child(const ArgsForChild& args) { //TODO change format for args
     if (chroot(file_directory) == -1){
         printError("problem with new root directory");
     }
+    //move to the new root directory //TODO: check if this is the right order
     if (chdir(file_directory) == -1){
         printError("problem changing the current working directory");
     }
