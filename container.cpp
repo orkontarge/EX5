@@ -17,12 +17,12 @@
 #define PROCESS_ID 1
 #define RELEASE_MODE 1
 #define MODE_MKDIR 0755
-#define ERROR_MSG "system error: %s \n"
-#define PATH_OF_PID "/sys/fs/cgroup/pids"
+#define ERROR_MSG "system error: "
+#define PATH_OF_PIDS "/sys/fs/cgroup/pids"
 #define PROC_PATH "/sys/fs/cgroup/pids/cgroup.procs" //TODO: relative or absolute path
 #define PID_PATH "/sys/fs/cgroup/pids.max" //TODO same debate - relative or absolute path.
 #define RELEASE_RESOURCES_PATH "/sys/fs/cgroup/pids/notify_on_release" //TODO where is this located??
-#define INDEX_OF_FIRST_ARG 4
+#define INDEX_OF_PATH_FILE_NAME 3
 using namespace std;
 
 struct ArgsForChild {
@@ -35,7 +35,7 @@ struct ArgsForChild {
 };
 
 void printError(const string &msg) {
-    fprintf(stderr, ERROR_MSG, msg.c_str());
+    cerr<<ERROR_MSG<< msg << endl;
     exit(1);
 }
 
@@ -62,7 +62,7 @@ int child(void *args) { //TODO change format for args
 
 
     // limit the number of processes:
-    if (mkdir(PATH_OF_PID, MODE_MKDIR) == -1) {
+    if (mkdir(PATH_OF_PIDS, MODE_MKDIR) == -1) {
         printError("problem with new directory");
     }
 
@@ -83,9 +83,22 @@ int child(void *args) { //TODO change format for args
         file.open(PID_PATH);
         file << argsForChild->num_processes;
         file.close();
+
     }
     catch (const exception &e) {
         printError("problem with accessing pid file");
+    }
+
+
+    //release resources of container
+    try {
+        ofstream file;
+        file.open(RELEASE_RESOURCES_PATH);
+        file << RELEASE_MODE;
+        file.close();
+    }
+    catch (const exception &e) {
+        printError("problem releasing resource of container");
     }
 
     //mount
@@ -116,7 +129,8 @@ int main(int argc, char *argv[]) {
                                      argv[3]
     };
 
-    argsForChild.args_for_program = argv + INDEX_OF_FIRST_ARG;
+    argsForChild.args_for_program = argv + INDEX_OF_PATH_FILE_NAME;
+
     // create new process - will be used as a container
     int child_pid = clone(child,
                           topOfStack,
@@ -130,22 +144,15 @@ int main(int argc, char *argv[]) {
 
     //TODO not sure about the order of the rest of the code. release, umount then delete?
 
-    //release resources of container
-    try {
-        ofstream file;
-        file.open(RELEASE_RESOURCES_PATH);
-        file << RELEASE_MODE;
-        file.close();
-    }
-    catch (const exception &e) {
-        printError("problem releasing resource of container");
-    }
 
 
     //unmount
     if (umount(PROC_PATH) == -1) { //TODO check if this is the right path
         printError("problem with mounting");
     }
+
+    //dealloc for stack
+    free(stack);
 
     //delete files created for container
     //TODO files to delete: files - pid.max,cgroup.procs, directories - fs,pids,cgroups
