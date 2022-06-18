@@ -22,7 +22,7 @@
 #define PROC_PATH "/sys/fs/cgroup/pids/cgroup.procs" //TODO: relative or absolute path
 #define PID_PATH "/sys/fs/cgroup/pids.max" //TODO same debate - relative or absolute path.
 #define RELEASE_RESOURCES_PATH "/sys/fs/cgroup/pids/notify_on_release" //TODO where is this located??
-#define INDEX_OF_PATH_FILE_NAME 3
+#define INDEX_OF_PATH_FILE_NAME 4
 using namespace std;
 
 struct ArgsForChild {
@@ -52,18 +52,18 @@ int child(void *args) { //TODO change format for args
 
     // change root directory
     if (chroot(file_directory) == -1) {
-        printError("problem with new root directory");
+        printError("problem with changing root directory");
     }
 
     //move to the new root directory //TODO: check if this is the right order
-    if (chdir(file_directory) == -1) {
+    if (chdir("/") == -1) {
         printError("problem changing the current working directory");
     }
 
 
     // limit the number of processes:
     if (mkdir(PATH_OF_PIDS, MODE_MKDIR) == -1) {
-        printError("problem with new directory");
+        printError("problem with creating new directory");
     }
 
     // attach the container process into this new cgroup
@@ -116,17 +116,16 @@ int child(void *args) { //TODO change format for args
 }
 
 int main(int argc, char *argv[]) {
-
     char *stack = (char *) malloc(STACK); //TODO dealloc
     char *topOfStack = stack + STACK;
     if (!stack) {
         printError("problem with memory allocation");
     }
 
-    struct ArgsForChild argsForChild{argv[0],
-                                     argv[1],
+    struct ArgsForChild argsForChild{argv[1],
                                      argv[2],
-                                     argv[3]
+                                     argv[3],
+                                     argv[4]
     };
 
     argsForChild.args_for_program = argv + INDEX_OF_PATH_FILE_NAME;
