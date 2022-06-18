@@ -17,7 +17,7 @@ One use of this can be to make an independent count of process IDs.
 The first process will have PID 1.
 
 Q2:
-In order to isolate a container from other processes can use the mount
+In order to isolate a container from other processes, you can use the mount
 namespace so that the container uses an independent file system, and that
 way doesnt have access to other processes through files that save data about them.
 
@@ -25,12 +25,12 @@ Q3:
 One possible general use of cgroups can be to limit the maximum number of processes
 
 Q4:
-fork creates a new process that is a duplicate of the original.
+Fork creates a new process that is a duplicate of the original.
 clone also creates a new child process, but allows use to have more control
 over the child process (and how much it shares with the parent process)
 
 Q5:
-the chroot gets a path and changes the root directory of the calling process to
+The chroot gets a path and changes the root directory of the calling process to
 the path that was given as an argument.
 
 Q6:

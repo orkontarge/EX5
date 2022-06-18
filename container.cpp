@@ -19,48 +19,50 @@
 #define MODE_MKDIR 0755
 #define ERROR_MSG "system error: %s \n"
 #define PATH_OF_PID "/sys/fs/cgroup/pids"
-#define PROC_PATH "/sys/fs/cgroup/pids/cgroup.procs" //TODO relative or absolute path
+#define PROC_PATH "/sys/fs/cgroup/pids/cgroup.procs" //TODO: relative or absolute path
 #define PID_PATH "/sys/fs/cgroup/pids.max" //TODO same debate - relative or absolute path.
 #define RELEASE_RESOURCES_PATH "/sys/fs/cgroup/pids/notify_on_release" //TODO where is this located??
-
+#define INDEX_OF_FIRST_ARG 4
 using namespace std;
 
-struct ArgsForChild{
-    char* new_hostname;
-    char* new_filesystem_directory;
-    char* num_processes;
-    char* path_to_program;
-    char* args_for_program[];
+struct ArgsForChild {
+    char *new_hostname;
+    char *new_filesystem_directory;
+    char *num_processes;
+    char *path_to_program;
+    char **args_for_program; //TODO: need to check if ** is fine. Before it was *agrs[]
 
 };
-void printError(const string& msg){
-    fprintf(stderr,ERROR_MSG, msg.c_str());
+
+void printError(const string &msg) {
+    fprintf(stderr, ERROR_MSG, msg.c_str());
+    exit(1);
 }
 
-int child(const ArgsForChild& args) { //TODO change format for args
+int child(void *args) { //TODO change format for args
 
-
-    char* hostname = args.new_hostname;
-    char*  file_directory = args.new_filesystem_directory;
+    ArgsForChild *argsForChild = (ArgsForChild*) args;
+    char *hostname = argsForChild->new_hostname;
+    char *file_directory = argsForChild->new_filesystem_directory;
 
     // change hostname
-    if (sethostname(hostname, strlen(hostname) ) == -1){
+    if (sethostname(hostname, strlen(hostname)) == -1) {
         printError("problem with hostname");
     }
 
     // change root directory
-    if (chroot(file_directory) == -1){
+    if (chroot(file_directory) == -1) {
         printError("problem with new root directory");
     }
 
     //move to the new root directory //TODO: check if this is the right order
-    if (chdir(file_directory) == -1){
+    if (chdir(file_directory) == -1) {
         printError("problem changing the current working directory");
     }
 
 
     // limit the number of processes:
-    if (mkdir(PATH_OF_PID,MODE_MKDIR) == -1){
+    if (mkdir(PATH_OF_PID, MODE_MKDIR) == -1) {
         printError("problem with new directory");
     }
 
@@ -71,7 +73,7 @@ int child(const ArgsForChild& args) { //TODO change format for args
         file << PROCESS_ID;
         file.close();
     }
-    catch(const exception &e){
+    catch (const exception &e) {
         printError("problem with proc file access");
     }
 
@@ -79,46 +81,50 @@ int child(const ArgsForChild& args) { //TODO change format for args
     try {
         ofstream file;
         file.open(PID_PATH);
-        file << args.num_processes;
+        file << argsForChild->num_processes;
         file.close();
     }
-    catch(const exception &e){
+    catch (const exception &e) {
         printError("problem with accessing pid file");
     }
 
     //mount
-    if (mount("proc", "/proc", "proc", 0, 0) == -1){
+    if (mount("proc", "/proc", "proc", 0, 0) == -1) {
         printError("problem with mounting");
     }
 
 
     //run the new program
-    if (execvp(args.path_to_program,args.args_for_program) == -1){
+    if (execvp(argsForChild->path_to_program, argsForChild->args_for_program) == -1) {
         printError("problem running new program");
     }
 
     return 0;
 }
 
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[]) {
 
-
-    void* stack = malloc(STACK); //TODO dealloc
-    if (!stack){
+    char *stack = (char *) malloc(STACK); //TODO dealloc
+    char *topOfStack = stack + STACK;
+    if (!stack) {
         printError("problem with memory allocation");
     }
 
-    int size = argc - 3;
-    char* args_for_program = new char[size]; //TODO dealloc
-    for (int i = 3; i < argc; ++i) {
-        args_for_program[i-3] = argv[i]; //TODO problem with type
-    }
+    struct ArgsForChild argsForChild{argv[0],
+                                     argv[1],
+                                     argv[2],
+                                     argv[3]
+    };
 
-    struct ArgsForChild args_for_child{argv[0],argv[1],argv[2],argv[3],args_for_program};
-
+    argsForChild.args_for_program = argv + INDEX_OF_FIRST_ARG;
     // create new process - will be used as a container
-    int child_pid = clone(child, stack+STACK, CLONE_NEWUTS | CLONE_NEWPID | CLONE_NEWNS | SIGCHLD
-            , args_for_child);
+    int child_pid = clone(child,
+                          topOfStack,
+                          CLONE_NEWUTS | CLONE_NEWPID | CLONE_NEWNS | SIGCHLD,
+                          &argsForChild);
+    if (child_pid == -1){
+        printError("error with creating clone");
+    }
     wait(NULL);
 
 
@@ -131,13 +137,13 @@ int main(int argc, char* argv[]) {
         file << RELEASE_MODE;
         file.close();
     }
-    catch(const exception &e){
+    catch (const exception &e) {
         printError("problem releasing resource of container");
     }
 
 
     //unmount
-    if (umount(PROC_PATH) == -1){ //TODO check if this is the right path
+    if (umount(PROC_PATH) == -1) { //TODO check if this is the right path
         printError("problem with mounting");
     }
 
