@@ -13,6 +13,7 @@
 #include <iostream>
 #include <fstream>
 #include <libgen.h>
+#include <dirent.h>
 
 #define STACK 8192
 #define PROCESS_ID 1
@@ -37,7 +38,49 @@ struct ArgsForChild {
 
 };
 
+int remove_directory(const char *path) {
+    DIR *d = opendir(path);
+    size_t path_len = strlen(path);
+    int r = -1;
 
+    if (d) {
+        struct dirent *p;
+
+        r = 0;
+        while (!r && (p=readdir(d))) {
+            int r2 = -1;
+            char *buf;
+            size_t len;
+
+            /* Skip the names "." and ".." as we don't want to recurse on them. */
+            if (!strcmp(p->d_name, ".") || !strcmp(p->d_name, ".."))
+                continue;
+
+            len = path_len + strlen(p->d_name) + 2;
+            buf = static_cast<char *>(malloc(len));
+
+            if (buf) {
+                struct stat statbuf;
+
+                snprintf(buf, len, "%s/%s", path, p->d_name);
+                if (!stat(buf, &statbuf)) {
+                    if (S_ISDIR(statbuf.st_mode))
+                        r2 = remove_directory(buf);
+                    else
+                        r2 = unlink(buf);
+                }
+                free(buf);
+            }
+            r = r2;
+        }
+        closedir(d);
+    }
+
+    if (!r)
+        r = rmdir(path);
+
+    return r;
+}
 void printError(const string &msg) {
     cerr << ERROR_MSG << msg << endl;
     //TODO: deallocte everything
@@ -60,7 +103,13 @@ int mkpath(const char *dir, mode_t mode) {
     return mkdir(dir, mode);
 }
 
+void concatenate(const char* str1,const char* str2, char** result){
+    unsigned int lengthOfProcPath = strlen(str1) + strlen(str2) + 1;
+    *result = (char*) malloc(sizeof (char)* lengthOfProcPath);
+    strcpy(*result, str1);
+    strcat(*result, str2);
 
+}
 int child(void *args) { //TODO change format for args
 
     ArgsForChild *argsForChild = (ArgsForChild *) args;
@@ -164,24 +213,28 @@ int main(int argc, char *argv[]) {
     //TODO not sure about the order of the rest of the code. release, umount then delete?
 
     //concatenate
-    unsigned int lengthOfProcPath = strlen(argsForChild.new_filesystem_directory) + strlen(PROC_PATH) + 1;
-    char *procPath = (char*) malloc(sizeof (char)* lengthOfProcPath);
-    strcpy(procPath, argsForChild.new_filesystem_directory);
-    strcat(procPath, PROC_PATH);
+    char *procPath;
+    concatenate(argsForChild.new_filesystem_directory,PROC_PATH,&procPath);
+
 
     //unmount
-    if (umount(procPath) == -1) { //TODO check if this is the right path
+    if (umount(procPath) != 0) { //TODO check if this is the right path
         printError("problem with Unmounting");
+    }
+
+
+
+    //delete files created for container
+
+    concatenate(argsForChild.new_filesystem_directory,"sys/fs/cgroup/pids/pids.max",&procPath);
+    cout<<procPath<<endl;
+    if ( unlink("./sys/fs/cgroup/pids/pids.max") == -1) { //TODO check if this is the right path
+        printError("problem with delete files");
     }
 
     //deallocs
     free(stack);
     free(procPath);
 
-//    //delete files created for container
-//    if (unlink(PID_PATH) == -1) { //TODO check if this is the right path
-//        printError("problem with unlinking");
-//    }
-    //TODO files to delete: files - pid.max,cgroup.procs, directories - fs,pids,cgroups
 }
 
