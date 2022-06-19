@@ -20,9 +20,11 @@
 #define MODE_MKDIR 0755
 #define ERROR_MSG "system error: "
 #define PATH_OF_PIDS "/sys/fs/cgroup/pids"
-#define PROC_PATH "/sys/fs/cgroup/pids/cgroup.procs" //TODO: relative or absolute path
+#define CGROUP_PROCS_PATH "/sys/fs/cgroup/pids/cgroup.procs" //TODO: relative or absolute path
 #define PID_PATH "/sys/fs/cgroup/pids/pids.max" //TODO same debate - relative or absolute path.
 #define RELEASE_RESOURCES_PATH "/sys/fs/cgroup/pids/notify_on_release" //TODO where is this located??
+#define PROC_PATH "proc"
+
 #define INDEX_OF_PATH_FILE_NAME 4
 using namespace std;
 
@@ -37,12 +39,12 @@ struct ArgsForChild {
 
 
 void printError(const string &msg) {
-    cerr<<ERROR_MSG<< msg << endl;
+    cerr << ERROR_MSG << msg << endl;
+    //TODO: deallocte everything
     exit(1);
 }
 
-int mkpath(const char *dir, mode_t mode)
-{
+int mkpath(const char *dir, mode_t mode) {
     struct stat sb{};
 
     if (!dir) {
@@ -61,7 +63,7 @@ int mkpath(const char *dir, mode_t mode)
 
 int child(void *args) { //TODO change format for args
 
-    ArgsForChild *argsForChild = (ArgsForChild*) args;
+    ArgsForChild *argsForChild = (ArgsForChild *) args;
     char *hostname = argsForChild->new_hostname;
     char *file_directory = argsForChild->new_filesystem_directory;
 
@@ -88,7 +90,7 @@ int child(void *args) { //TODO change format for args
     // attach the container process into this new cgroup
     try {
         ofstream file;
-        file.open(PROC_PATH);
+        file.open(CGROUP_PROCS_PATH);
         file << PROCESS_ID;
         file.close();
     }
@@ -125,7 +127,6 @@ int child(void *args) { //TODO change format for args
         printError("problem with mounting");
     }
 
-
     //run the new program
     if (execvp(argsForChild->path_to_program, argsForChild->args_for_program) == -1) {
         printError("problem running new program");
@@ -154,7 +155,7 @@ int main(int argc, char *argv[]) {
                           topOfStack,
                           CLONE_NEWUTS | CLONE_NEWPID | CLONE_NEWNS | SIGCHLD,
                           &argsForChild);
-    if (child_pid == -1){
+    if (child_pid == -1) {
         printError("error with creating clone");
     }
     wait(NULL);
@@ -162,20 +163,25 @@ int main(int argc, char *argv[]) {
 
     //TODO not sure about the order of the rest of the code. release, umount then delete?
 
-
+    //concatenate
+    unsigned int lengthOfProcPath = strlen(argsForChild.new_filesystem_directory) + strlen(PROC_PATH) + 1;
+    char *procPath = (char*) malloc(sizeof (char)* lengthOfProcPath);
+    strcpy(procPath, argsForChild.new_filesystem_directory);
+    strcat(procPath, PROC_PATH);
 
     //unmount
-    if (umount(PROC_PATH) == -1) { //TODO check if this is the right path
+    if (umount(procPath) == -1) { //TODO check if this is the right path
         printError("problem with Unmounting");
     }
 
-    //dealloc for stack
+    //deallocs
     free(stack);
+    free(procPath);
 
-    //delete files created for container
-    if (unlink(PID_PATH) == -1) { //TODO check if this is the right path
-        printError("problem with Unmounting");
-    }
+//    //delete files created for container
+//    if (unlink(PID_PATH) == -1) { //TODO check if this is the right path
+//        printError("problem with unlinking");
+//    }
     //TODO files to delete: files - pid.max,cgroup.procs, directories - fs,pids,cgroups
 }
 
