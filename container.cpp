@@ -12,6 +12,7 @@
 #include <sys/stat.h>
 #include <iostream>
 #include <fstream>
+#include <libgen.h>
 
 #define STACK 8192
 #define PROCESS_ID 1
@@ -20,7 +21,7 @@
 #define ERROR_MSG "system error: "
 #define PATH_OF_PIDS "/sys/fs/cgroup/pids"
 #define PROC_PATH "/sys/fs/cgroup/pids/cgroup.procs" //TODO: relative or absolute path
-#define PID_PATH "/sys/fs/cgroup/pids.max" //TODO same debate - relative or absolute path.
+#define PID_PATH "/sys/fs/cgroup/pids/pids.max" //TODO same debate - relative or absolute path.
 #define RELEASE_RESOURCES_PATH "/sys/fs/cgroup/pids/notify_on_release" //TODO where is this located??
 #define INDEX_OF_PATH_FILE_NAME 4
 using namespace std;
@@ -34,10 +35,29 @@ struct ArgsForChild {
 
 };
 
+
 void printError(const string &msg) {
     cerr<<ERROR_MSG<< msg << endl;
     exit(1);
 }
+
+int mkpath(const char *dir, mode_t mode)
+{
+    struct stat sb{};
+
+    if (!dir) {
+        errno = EINVAL;
+        return 1;
+    }
+
+    if (!stat(dir, &sb))
+        return 0;
+
+    mkpath(dirname(strdupa(dir)), mode);
+
+    return mkdir(dir, mode);
+}
+
 
 int child(void *args) { //TODO change format for args
 
@@ -60,9 +80,8 @@ int child(void *args) { //TODO change format for args
         printError("problem changing the current working directory");
     }
 
-
     // limit the number of processes:
-    if (mkdir(PATH_OF_PIDS, MODE_MKDIR) == -1) {
+    if (mkpath(PATH_OF_PIDS, MODE_MKDIR) != 0) {
         printError("problem with creating new directory");
     }
 
@@ -116,7 +135,7 @@ int child(void *args) { //TODO change format for args
 }
 
 int main(int argc, char *argv[]) {
-    char *stack = (char *) malloc(STACK); //TODO dealloc
+    char *stack = (char *) malloc(STACK);
     char *topOfStack = stack + STACK;
     if (!stack) {
         printError("problem with memory allocation");
@@ -147,7 +166,7 @@ int main(int argc, char *argv[]) {
 
     //unmount
     if (umount(PROC_PATH) == -1) { //TODO check if this is the right path
-        printError("problem with mounting");
+        printError("problem with Unmounting");
     }
 
     //dealloc for stack
