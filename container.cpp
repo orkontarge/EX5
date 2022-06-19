@@ -10,7 +10,6 @@
 #include <cstring>
 #include <sys/mount.h>
 #include <sys/stat.h>
-#include <iostream>
 #include <fstream>
 #include <libgen.h>
 #include <dirent.h>
@@ -25,10 +24,10 @@
 #define PID_PATH "/sys/fs/cgroup/pids/pids.max" //TODO same debate - relative or absolute path.
 #define RELEASE_RESOURCES_PATH "/sys/fs/cgroup/pids/notify_on_release" //TODO where is this located??
 #define PROC_PATH "proc"
-
+#define REMOVE_COMMAND "rm -rf "
+#define DELETE_ALL_FROM_SYS "/sys/*"
 #define INDEX_OF_PATH_FILE_NAME 4
 using namespace std;
-
 struct ArgsForChild {
     char *new_hostname;
     char *new_filesystem_directory;
@@ -37,6 +36,8 @@ struct ArgsForChild {
     char **args_for_program; //TODO: need to check if ** is fine. Before it was *agrs[]
 
 };
+
+class path;
 
 int remove_directory(const char *path) {
     DIR *d = opendir(path);
@@ -143,6 +144,7 @@ int child(void *args) { //TODO change format for args
         ofstream file;
         file.open(CGROUP_PROCS_PATH);
         file << PROCESS_ID;
+        chmod(CGROUP_PROCS_PATH,MODE_MKDIR);
         file.close();
     }
     catch (const exception &e) {
@@ -154,6 +156,7 @@ int child(void *args) { //TODO change format for args
         ofstream file;
         file.open(PID_PATH);
         file << argsForChild->num_processes;
+        chmod(PID_PATH,MODE_MKDIR);
         file.close();
 
     }
@@ -167,10 +170,11 @@ int child(void *args) { //TODO change format for args
         ofstream file;
         file.open(RELEASE_RESOURCES_PATH);
         file << RELEASE_MODE;
+        chmod(RELEASE_RESOURCES_PATH,MODE_MKDIR);
         file.close();
     }
     catch (const exception &e) {
-        printError("problem releasing resource of container");
+        printError("problem creating file notify_on_release");
     }
 
     //mount
@@ -209,16 +213,8 @@ int main(int argc, char *argv[]) {
     if (child_pid == -1) {
         printError("error with creating clone");
     }
-    wait(NULL);
+    wait(nullptr);
 
-    char cwd[PATH_MAX];
-    if (getcwd(cwd, sizeof(cwd)) != NULL) {
-        printf("Current working dir: %s\n", cwd);
-    } else {
-        perror("getcwd() error");
-        return 1;
-    }
-    //TODO not sure about the order of the rest of the code. release, umount then delete?
 
     //concatenate
     char *procPath;
@@ -226,31 +222,24 @@ int main(int argc, char *argv[]) {
 
 
     //unmount
-    if (umount(procPath) != 0) { //TODO check if this is the right path
+    if (umount(procPath) != 0) {
         printError("problem with Unmounting");
     }
 
 
-    if(mkdir("/home/avigayil/Documents/OS/EX5/image/gayil", 0755)==-1){
-        printError("asdfsadfadfa");
-    }
-    try {
-        ofstream file;
-        file.open("/home/avigayil/Documents/OS/EX5/image/gayil/dummy");
-        file << 1;
-        file.close();
-
-    }
-    catch (const exception &e) {
-        printError("problem with accessing pid file");
-    }
-    chmod("/home/avigayil/Documents/OS/EX5/image/gayil/dummy",0755);
     //delete files created for container
 
-    concatenate(argsForChild.new_filesystem_directory,"sys/fs/cgroup/pids/pids.max",&procPath);
-    if ( remove("/home/avigayil/Documents/OS/EX5/image/gayil") == -1) { //TODO check if this is the right path
-        printError("problem with delete files");
+    char *cmd_command = new char[strlen(argsForChild.new_filesystem_directory)+20];
+    strcpy(cmd_command,REMOVE_COMMAND);
+    strcat(cmd_command, argsForChild.new_filesystem_directory);
+    strcat(cmd_command,DELETE_ALL_FROM_SYS);
+    try {
+        system(cmd_command);
     }
+    catch (const exception &e) {
+        printError("problem with deleting files");
+    }
+
 
     //deallocs
     free(stack);
@@ -258,3 +247,13 @@ int main(int argc, char *argv[]) {
 
 }
 
+
+
+//TODO: delete all
+//char cwd[PATH_MAX];
+//if (getcwd(cwd, sizeof(cwd)) != NULL) {
+//printf("Current working dir: %s\n", cwd);
+//} else {
+//perror("getcwd() error");
+//return 1;
+//}
