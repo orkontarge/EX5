@@ -37,72 +37,13 @@ struct ArgsForChild {
 
 };
 
-class path;
 
-int remove_directory(const char *path) {
-    DIR *d = opendir(path);
-    size_t path_len = strlen(path);
-    int r = -1;
-
-    if (d) {
-        struct dirent *p;
-
-        r = 0;
-        while (!r && (p=readdir(d))) {
-            int r2 = -1;
-            char *buf;
-            size_t len;
-
-            /* Skip the names "." and ".." as we don't want to recurse on them. */
-            if (!strcmp(p->d_name, ".") || !strcmp(p->d_name, ".."))
-                continue;
-
-            len = path_len + strlen(p->d_name) + 2;
-            buf = static_cast<char *>(malloc(len));
-
-            if (buf) {
-                struct stat statbuf;
-
-                snprintf(buf, len, "%s/%s", path, p->d_name);
-                if (!stat(buf, &statbuf)) {
-                    if (S_ISDIR(statbuf.st_mode))
-                        r2 = remove_directory(buf);
-                    else
-                        r2 = unlink(buf);
-                }
-                free(buf);
-            }
-            r = r2;
-        }
-        closedir(d);
-    }
-
-    if (!r)
-        r = rmdir(path);
-
-    return r;
-}
 void printError(const string &msg) {
     cerr << ERROR_MSG << msg << endl;
     //TODO: deallocte everything
     exit(1);
 }
 
-int mkpath(const char *dir, mode_t mode) {
-    struct stat sb{};
-
-    if (!dir) {
-        errno = EINVAL;
-        return 1;
-    }
-
-    if (!stat(dir, &sb))
-        return 0;
-
-    mkpath(dirname(strdupa(dir)), mode);
-
-    return mkdir(dir, mode);
-}
 
 void concatenate(const char* str1,const char* str2, char** result){
     unsigned int lengthOfProcPath = strlen(str1) + strlen(str2) + 1;
@@ -127,16 +68,9 @@ int child(void *args) { //TODO change format for args
         printError("problem with changing root directory");
     }
 
-    //move to the new root directory //TODO: check if this is the right order
+    //move to the new root directory
     if (chdir("/") == -1) {
         printError("problem changing the current working directory");
-    }
-
-
-
-    // limit the number of processes:
-    if (mkpath(PATH_OF_PIDS, MODE_MKDIR) != 0) {
-        printError("problem with creating new directory");
     }
 
     // attach the container process into this new cgroup
@@ -150,6 +84,15 @@ int child(void *args) { //TODO change format for args
     catch (const exception &e) {
         printError("problem with proc file access");
     }
+
+    // limit the number of processes:
+    if(mkdir("/sys/fs/",MODE_MKDIR)|
+    mkdir("/sys/fs/cgroup/", MODE_MKDIR)|
+    mkdir("/sys/fs/cgroup/pids", MODE_MKDIR) == -1){
+        printError("problem with creating dirs");
+    }
+
+
 
     //set max process number
     try {
@@ -182,6 +125,7 @@ int child(void *args) { //TODO change format for args
         printError("problem with mounting");
     }
 
+
     //run the new program
     if (execvp(argsForChild->path_to_program, argsForChild->args_for_program) == -1) {
         printError("problem running new program");
@@ -202,7 +146,10 @@ int main(int argc, char *argv[]) {
                                      argv[3],
                                      argv[4]
     };
+    char *fileSystemWithSlash;
+    concatenate(argsForChild.new_filesystem_directory,"/",&fileSystemWithSlash);
 
+    argsForChild.new_filesystem_directory = fileSystemWithSlash;
     argsForChild.args_for_program = argv + INDEX_OF_PATH_FILE_NAME;
 
     // create new process - will be used as a container
@@ -218,7 +165,7 @@ int main(int argc, char *argv[]) {
 
     //concatenate
     char *procPath;
-    concatenate(argsForChild.new_filesystem_directory,PROC_PATH,&procPath);
+    concatenate(fileSystemWithSlash,PROC_PATH,&procPath);
 
 
     //unmount
@@ -229,7 +176,7 @@ int main(int argc, char *argv[]) {
 
     //delete files created for container
 
-    char *cmd_command = new char[strlen(argsForChild.new_filesystem_directory)+20];
+    char *cmd_command = new char[strlen(argsForChild.new_filesystem_directory)+20]; //TODO change number
     strcpy(cmd_command,REMOVE_COMMAND);
     strcat(cmd_command, argsForChild.new_filesystem_directory);
     strcat(cmd_command,DELETE_ALL_FROM_SYS);
