@@ -173,6 +173,9 @@ int main(int argc, char *argv[]) {
     free(stack);
 
     //delete files created for container
+    if (unlink(PID_PATH) == -1) { //TODO check if this is the right path
+        printError("problem with Unmounting");
+    }
     //TODO files to delete: files - pid.max,cgroup.procs, directories - fs,pids,cgroups
 }
 
