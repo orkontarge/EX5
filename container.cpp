@@ -131,6 +131,8 @@ int child(void *args) { //TODO change format for args
         printError("problem changing the current working directory");
     }
 
+
+
     // limit the number of processes:
     if (mkpath(PATH_OF_PIDS, MODE_MKDIR) != 0) {
         printError("problem with creating new directory");
@@ -209,7 +211,13 @@ int main(int argc, char *argv[]) {
     }
     wait(NULL);
 
-
+    char cwd[PATH_MAX];
+    if (getcwd(cwd, sizeof(cwd)) != NULL) {
+        printf("Current working dir: %s\n", cwd);
+    } else {
+        perror("getcwd() error");
+        return 1;
+    }
     //TODO not sure about the order of the rest of the code. release, umount then delete?
 
     //concatenate
@@ -223,11 +231,24 @@ int main(int argc, char *argv[]) {
     }
 
 
+    if(mkdir("/home/avigayil/Documents/OS/EX5/image/gayil", 0755)==-1){
+        printError("asdfsadfadfa");
+    }
+    try {
+        ofstream file;
+        file.open("/home/avigayil/Documents/OS/EX5/image/gayil/dummy");
+        file << 1;
+        file.close();
 
+    }
+    catch (const exception &e) {
+        printError("problem with accessing pid file");
+    }
+    chmod("/home/avigayil/Documents/OS/EX5/image/gayil/dummy",0755);
     //delete files created for container
 
     concatenate(argsForChild.new_filesystem_directory,"sys/fs/cgroup/pids/pids.max",&procPath);
-    if ( unlink("./sys/fs/cgroup/pids/pids.max") == -1) { //TODO check if this is the right path
+    if ( remove("/home/avigayil/Documents/OS/EX5/image/gayil") == -1) { //TODO check if this is the right path
         printError("problem with delete files");
     }
 
