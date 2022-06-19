@@ -227,7 +227,6 @@ int main(int argc, char *argv[]) {
     //delete files created for container
 
     concatenate(argsForChild.new_filesystem_directory,"sys/fs/cgroup/pids/pids.max",&procPath);
-    cout<<procPath<<endl;
     if ( unlink("./sys/fs/cgroup/pids/pids.max") == -1) { //TODO check if this is the right path
         printError("problem with delete files");
     }
