@@ -4,7 +4,6 @@ EX: 5
 
 
 FILES:
-VirtualMemory.cpp
 Makefile
 container
 sockets

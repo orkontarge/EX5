@@ -25,6 +25,7 @@
 #define SERVER 2
 #define EXIT_FAILURE 1
 #define BUFFER_SIZE 256
+#define MAXHOSTNAME 256
 #define ERROR_MSG "system error: "
 #define NULL nullptr
 using namespace std;
@@ -131,7 +132,7 @@ int read_data(int s, char *buf, int n) {
 
     while (bcount < n) { /* loop until full buffer */
         br = read(s, buf, n-bcount);
-        if ((br > 0)  {
+        if (br > 0)  {
             bcount += br;
             buf += br;
         }
@@ -151,7 +152,7 @@ int write_data(int s, char *buf, int n) {
 
     while (bcount < n) { /* loop until full buffer */
         br = write(s, buf, n-bcount);
-        if ((br > 0)  {
+        if (br > 0)  {
             bcount += br;
             buf += br;
         }
@@ -183,7 +184,8 @@ int main(int argc, char *argv[]) {
 
     }
     if(argc==CLIENT){
-        char *hostname; //TODO not sure what to do with this.
+        char hostname[MAXHOSTNAME + 1];
+        gethostname(hostname,MAXHOSTNAME);
         int client_socket;
         char* terminal_command = argv[3];
         client_socket = call_socket(hostname,*argv[2]);
