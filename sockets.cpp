@@ -29,6 +29,7 @@
 #define NULL nullptr
 using namespace std;
 
+//TODO cannot connect to server. client throws error? look at forum.
 
 void printError(const string &msg) {
     cerr << ERROR_MSG << msg << endl;
@@ -36,7 +37,7 @@ void printError(const string &msg) {
 }
 
 
-//create welcome socket for server
+//create welcome socket for server: socket -> bind -> listen
 int establish(unsigned short portnum) {
     char myname[MAXHOSTNAME+1]; //TODO set value
     int s;
@@ -80,7 +81,7 @@ int establish(unsigned short portnum) {
 }
 
 
-// connection socket for server
+// connection socket for server: accept
 int get_connection(int s) {
     int t; /* socket of connection */
 
@@ -93,7 +94,7 @@ int get_connection(int s) {
 }
 
 //TODO who is this hostname??
-//create client socket
+//create client socket: socket -> connect
 int call_socket(char *hostname, unsigned short portnum) {
 
     struct sockaddr_in sa;
