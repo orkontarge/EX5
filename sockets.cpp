@@ -173,7 +173,10 @@ int main(int argc, char *argv[]) {
             connected_socket = get_connection(welcome_socket);
             //TODO write reply to connection socket - how?
             bcount = read_data(connected_socket,buf,BUFFER_SIZE);
-            //TODO run received terminal commands from port
+            if(system(buf) == -1){
+                printError("problem with running terminal command");
+                exit(EXIT_FAILURE);
+            }
         }
 
 
