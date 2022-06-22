@@ -21,13 +21,12 @@
 #include <netdb.h>
 
 #define MAX_CLIENTS 5
-#define CLIENT 3
-#define SERVER 2
+#define CLIENT 4
+#define SERVER 3
 #define EXIT_FAILURE 1
 #define BUFFER_SIZE 256
 #define MAXHOSTNAME 256
 #define ERROR_MSG "system error: "
-#define NULL nullptr
 using namespace std;
 
 //TODO cannot connect to server. client throws error? look at forum.
@@ -40,7 +39,7 @@ void printError(const string &msg) {
 
 //create welcome socket for server: socket -> bind -> listen
 int establish(unsigned short portnum) {
-    char myname[MAXHOSTNAME+1]; //TODO set value
+    char myname[MAXHOSTNAME+1];
     int s;
     struct sockaddr_in sa;
     struct hostent *hp;
@@ -48,7 +47,7 @@ int establish(unsigned short portnum) {
     //hostnet initialization
     gethostname(myname, MAXHOSTNAME);
     hp = gethostbyname(myname);
-    if (hp == NULL){
+    if (hp == nullptr){
         printError("problem with server hostname");
         exit(EXIT_FAILURE);
     }
@@ -102,7 +101,7 @@ int call_socket(char *hostname, unsigned short portnum) {
     struct hostent *hp;
     int s;
 
-    if ((hp= gethostbyname (hostname)) == NULL) {
+    if ((hp= gethostbyname (hostname)) == nullptr) {
         printError("problem with getting hostname in client");
         exit(EXIT_FAILURE);
     }
@@ -144,7 +143,6 @@ int read_data(int s, char *buf, int n) {
     return(bcount);
 }
 
-//TODO made a write function that is the same as the 'read_data' fuction we saw in class. do we need to do like this? write with buffer? or can we just write
 int write_data(int s, char *buf, int n) {
     int bcount;       /* counts bytes read */
     int br;               /* bytes read this pass */
@@ -157,8 +155,8 @@ int write_data(int s, char *buf, int n) {
             buf += br;
         }
         if (br < 1) {
-            return(-1);
-        }
+            printError("problem with writing");
+            exit(EXIT_FAILURE);        }
     }
     return(bcount);
 }
@@ -167,14 +165,13 @@ int main(int argc, char *argv[]) {
     if(argc==SERVER){
         int welcome_socket;
         int connected_socket;
-        int bcount; // number of bytes read
-        welcome_socket = establish(*argv[2]);
+        welcome_socket = establish(stoi(argv[2]));
         while(true){ //server waits for client connection
             char buf[BUFFER_SIZE];
             //TODO the connected socket connects to any client that calls it? no need to give him the calling client?
             connected_socket = get_connection(welcome_socket);
-            //TODO write reply to connection socket - how?
-            bcount = read_data(connected_socket,buf,BUFFER_SIZE);
+
+            read_data(connected_socket,buf,BUFFER_SIZE);
             if(system(buf) == -1){
                 printError("problem with running terminal command");
                 exit(EXIT_FAILURE);
@@ -183,12 +180,20 @@ int main(int argc, char *argv[]) {
 
 
     }
-    if(argc==CLIENT){
+    if(argc>=CLIENT){
         char hostname[MAXHOSTNAME + 1];
         gethostname(hostname,MAXHOSTNAME);
         int client_socket;
-        char* terminal_command = argv[3];
-        client_socket = call_socket(hostname,*argv[2]);
+
+        //concat terminal_command
+        char terminal_command[256];
+        for (int i = 3; i<argc ;i++){
+            strcat(terminal_command,argv[i]);
+            strcat(terminal_command," ");
+
+        }
+
+        client_socket = call_socket(hostname,stoi(argv[2]));
         //TODO read reply to confirm connection - how?
 
         write_data(client_socket,terminal_command,BUFFER_SIZE);
